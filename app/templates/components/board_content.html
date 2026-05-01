@@ -1,0 +1,33 @@
+{% for column in columns %}
+<div class="column" data-column-id="{{ column.id }}">
+    <div class="column-header">
+        <span>{{ column.name }}</span>
+        <span class="task-count">{{ column.tasks|length }}</span>
+    </div>
+    <div class="column-tasks">
+        {% for task in column.tasks %}
+        <div class="task-card" data-task-id="{{ task.id }}" draggable="true">
+            <div class="task-title">{{ task.title }}</div>
+            {% if task.description %}
+            <div class="task-description">{{ task.description[:100] }}{% if task.description|length > 100 %}...{% endif
+                %}</div>
+            {% endif %}
+            <div class="task-meta">
+                <span class="priority-badge priority-{{ task.priority }}">{{ task.priority }}</span>
+                {% if task.due_date %}
+                <span class="due-date {% if task.due_date and task.due_date < today.isoformat() %}overdue{% endif %}">
+                    {{ task.due_date }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="task-actions">
+                <button onclick="openTaskModal('{{ task.id }}')" title="編集">✏️</button>
+                <button onclick="openScheduleModalForTask('{{ task.id }}')" title="定期実行">⏰</button>
+                <button onclick="deleteTask('{{ task.id }}')" title="削除">🗑️</button>
+            </div>
+        </div>
+        {% endfor %}
+        <button class="add-task-btn" onclick="openTaskModal(null, {{ column.id }})">+ タスクを追加</button>
+    </div>
+</div>
+{% endfor %}

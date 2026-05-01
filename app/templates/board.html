@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Kanban Board</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    <header class="header">
+        <h1>AI Kanban Board</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="toggleChat()">AI Chat</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <!-- Project Sidebar -->
+        <div class="project-sidebar" id="project-sidebar">
+            <h3>プロジェクト</h3>
+            <div id="project-list"></div>
+            <button class="add-project-btn" onclick="openProjectModal()">+ 新規プロジェクト</button>
+        </div>
+
+        <!-- Board Area -->
+        <div id="board-container" class="board-container" hx-get="/htmx/board" hx-trigger="load" hx-swap="innerHTML">
+            <div class="empty-state">Loading board...</div>
+        </div>
+
+        <!-- Chat Panel -->
+        <div id="chat-panel" class="chat-panel hidden">
+            <div class="chat-header">
+                <h2>AI Assistant</h2>
+                <button class="btn btn-secondary" onclick="toggleChat()">Close</button>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input-area">
+                <textarea id="chat-input" class="chat-input" rows="2" placeholder="AIに指示を入力..."
+                    onkeydown="sendMessage(event)"></textarea>
+                <button class="btn btn-primary" onclick="sendMessage(event)">送信</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Modal -->
+    <div id="project-modal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="project-modal-title">プロジェクト作成</h2>
+            </div>
+            <form id="project-form" onsubmit="saveProject(event)">
+                <input type="hidden" name="project_id" value="">
+                <div class="form-group">
+                    <label>名前</label>
+                    <input type="text" name="name" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label>説明</label>
+                    <textarea name="description" rows="2" maxlength="1000"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>色</label>
+                    <input type="color" name="color" value="#3B82F6">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeProjectModal()">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div id="task-modal" class="modal-overlay" style="display: none;">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h2 id="modal-title">タスク作成</h2>
+            </div>
+            <div class="modal-tabs">
+                <button type="button" class="tab-btn active" onclick="switchTab('basic')" data-tab="basic">基本情報</button>
+                <button type="button" class="tab-btn" onclick="switchTab('schedule')" data-tab="schedule">定期実行</button>
+            </div>
+            <form id="task-form" onsubmit="saveTask(event)">
+                <input type="hidden" name="task_id" value="">
+                <input type="hidden" name="project_id" value="">
+                <div id="tab-basic" class="tab-content active">
+                    <div class="form-group">
+                        <label>タイトル</label>
+                        <input type="text" name="title" required maxlength="100">
+                    </div>
+                    <div class="form-group">
+                        <label>説明</label>
+                        <textarea name="description" rows="3" maxlength="1000"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>カラム</label>
+                        <select name="column_id" required>
+                            <option value="">選択してください</option>
+                            <option value="1">ToDo</option>
+                            <option value="2">Doing</option>
+                            <option value="3">Done</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>優先度</label>
+                        <select name="priority">
+                            <option value="low">低</option>
+                            <option value="medium" selected>中</option>
+                            <option value="high">高</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>期限日</label>
+                        <input type="date" name="due_date">
+                    </div>
+                </div>
+                <div id="tab-schedule" class="tab-content">
+                    <div id="schedule-list"></div>
+                    <button type="button" class="btn btn-secondary" onclick="openScheduleForm()">+ 定期実行を追加</button>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Schedule Form Modal -->
+    <div id="schedule-modal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="schedule-modal-title">定期実行設定</h2>
+            </div>
+            <form id="schedule-form" onsubmit="saveSchedule(event)">
+                <input type="hidden" name="schedule_id" value="">
+                <input type="hidden" name="task_id_for_schedule" value="">
+                <div class="form-group">
+                    <label>スケジュール名</label>
+                    <input type="text" name="schedule_name" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label>実行種別</label>
+                    <select name="command_type" onchange="toggleCommandType()">
+                        <option value="agent">AIコマンド</option>
+                        <option value="shell">シェルコマンド</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>コマンド</label>
+                    <textarea name="schedule_command" rows="3" required placeholder="実行するコマンドを入力"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>実行間隔タイプ</label>
+                    <select name="schedule_type" onchange="toggleScheduleType()">
+                        <option value="interval">間隔（分）</option>
+                        <option value="cron">Cron式</option>
+                    </select>
+                </div>
+                <div class="form-group" id="interval-group">
+                    <label>間隔（分）</label>
+                    <input type="number" name="interval_minutes" value="60" min="1">
+                </div>
+                <div class="form-group" id="cron-group" style="display: none;">
+                    <label>Cron式</label>
+                    <input type="text" name="cron_expression" placeholder="0 9 * * *">
+                </div>
+                <div class="form-group">
+                    <label>フォルダ・ファイル</label>
+                    <div id="resource-list"></div>
+                    <div class="resource-input-row">
+                        <select id="resource_type_input">
+                            <option value="file">ファイル</option>
+                            <option value="folder">フォルダ</option>
+                        </select>
+                        <input type="text" id="resource_path_input" placeholder="パスを入力">
+                        <button type="button" onclick="addResource()">追加</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="append_to_task_description" checked>
+                        タスク説明欄に結果を追記する
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="is_enabled" checked>
+                        有効
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeScheduleModal()">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+```
+
+
+</html>
